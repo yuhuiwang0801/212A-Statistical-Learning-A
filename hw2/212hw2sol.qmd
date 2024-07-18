@@ -1,0 +1,677 @@
+---
+title: "Biostat 212a Homework 2"
+subtitle: "Due Feb 6, 2024 @ 11:59PM"
+author: "Yuhui Wang, UID: 606332401"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+format:
+  html:
+    theme: cosmo
+    embed-resources: true
+    number-sections: true
+    toc: true
+    toc-depth: 4
+    toc-location: left
+    code-fold: false
+engine: knitr
+knitr:
+  opts_chunk: 
+    fig.align: 'center'
+    # fig.width: 6
+    # fig.height: 4
+    message: FALSE
+    cache: false
+---
+
+## ISL Exercise 4.8.1 (10pts)
+> Using a little bit of algebra, prove that (4.2) is equivalent to (4.3). In
+> other words, the logistic function representation and logit representation
+> for the logistic regression model are equivalent.
+
+**Answer:**
+
+To answer that question, we are actually trying to prove that
+
+(4.2)
+$$
+p(X) = \frac{e^{\beta_0 + \beta_1X}}{1 + e^{\beta_0 + \beta_1X}}
+$$
+
+is equivalent to
+
+(4.3)
+$$
+\frac{p(X)}{1-p(X)} = e^{\beta_0 + \beta_1X}
+$$
+
+
+To prove that, firstly, assume $x = e^{\beta_0 + \beta_1X}$
+Then according to equation (4.2), we have:
+\begin{align}
+\frac{p(X)}{1-p(X)} &= \frac{\frac{x}{1 + x}}
+                            {1 - \frac{x}{1 + x}} \\
+              &= \frac{\frac{x}{1 + x}}
+                      {\frac{1}{1 + x}} \\
+              &= x
+\end{align}
+After substituting $x$ with $e^{\beta_0 + \beta_1X}$, we have equation (4.3).
+
+## ISL Exercise 4.8.6 (10pts)
+> Suppose we collect data for a group of students in a statistics class with
+> variables $X_1 =$ hours studied, $X_2 =$ undergrad GPA, and $Y =$ receive an A.
+> We fit a logistic regression and produce estimated coefficient,
+> $\hat\beta_0 = -6$, $\hat\beta_1 = 0.05$, $\hat\beta_2 = 1$.
+>
+> a. Estimate the probability that a student who studies for 40h and has an
+>    undergrad GPA of 3.5 gets an A in the class.
+
+**Answer:**
+
+The logistic model for this situation is:
+
+$$
+\log\left(\frac{p(X)}{1-p(X)}\right) = -6 + 0.05X_1 + X_2
+$$
+
+Converting this to a probability gives:
+
+$$
+p(X) = \frac{e^{-6 + 0.05X_1 + X_2}}{1 + e^{-6 + 0.05X_1 + X_2}}
+$$
+
+when $X_1 = 40$ and $X_2 = 3.5$, 
+```{r}
+exp(-6 + 0.05 * 40 + 3.5) / (1 + exp(-6 + 0.05 * 40 + 3.5))
+```
+
+$p(X) = 0.38$
+
+> b. How many hours would the student in part (a) need to study to have a 50%
+>    chance of getting an A in the class?
+
+**Answer:**
+
+Given the GPA ($X_2$) is fixed, we can solve for $X_1$ where $p(X) = 0.5$.
+According to the equation above, we have: 
+$0 = −6 + 0.05X_1 + 3.5$,
+After solving this equation, we have $X_1 = 50$ hours.
+
+
+## ISL Exercise 4.8.9 (10pts)
+> This problem has to do with _odds_.
+>
+> a. On average, what fraction of people with an odds of 0.37 of defaulting on
+>    their credit card payment will in fact default?
+
+**Answer:**
+As odds is defined: $p/(1-p)$, we have:
+
+$$\frac{p(x)}{1 - p(x)} = 0.37$$
+
+therefore,
+
+$$p(x) = \frac{0.37}{1 + 0.37} = 0.27$$
+The fraction is 0.27.
+
+> b. Suppose that an individual has a 16% chance of defaulting on her credit
+>    card payment. What are the odds that she will default?
+
+**Answer:**
+
+According to the equation,
+$$Odds = \frac{0.16}{1 - 0.16}  = 0.19$$
+The odds is 0.19.
+
+
+## ISL Exercise 4.8.13 (a)-(i) (50pts)
+
+> This question should be answered using the `Weekly` data set, which is part
+> of the `ISLR2` package. This data is similar in nature to the `Smarket` data
+> from this chapter's lab, except that it contains 1,089 weekly returns for 21
+> years, from the beginning of 1990 to the end of 2010.
+>
+> a. Produce some numerical and graphical summaries of the `Weekly` data. Do
+>    there appear to be any patterns?
+
+**Answer:**
+```{r, message = FALSE, warning = FALSE}
+library(MASS)
+library(class)
+library(tidyverse)
+library(corrplot)
+library(ISLR2)
+library(e1071)
+```
+
+```{r}
+summary(Weekly)
+```
+
+```{r}
+corrplot(cor(Weekly[, -9]), type = "lower", diag = FALSE, method = "ellipse")
+```
+
+From the graph, we can see that variable `Volume` is strongly positively correlated with variable `Year`. Other variables' correlations are week.
+
+
+> b. Use the full data set to perform a logistic regression with `Direction` as
+>    the response and the five lag variables plus `Volume` as predictors. Use
+>    the summary function to print the results. Do any of the predictors appear
+>    to be statistically significant? If so, which ones?
+
+**Answer:**
+```{r}
+logistic_fit <- glm(
+  Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume,
+  data = Weekly,
+  family = binomial
+)
+summary(logistic_fit)
+```
+
+From the summary, we know that Lag2 is significant.
+
+> c. Compute the confusion matrix and overall fraction of correct predictions.
+>    Explain what the confusion matrix is telling you about the types of
+>    mistakes made by logistic regression.
+
+**Answer:**
+```{r}
+contrasts(Weekly$Direction)
+```
+
+```{r}
+pred <- predict(logistic_fit, type = "response") > 0.5
+t <- table(ifelse(pred, "Up (pred)", "Down (pred)"), Weekly$Direction)
+t
+```
+
+```{r}
+sum(diag(t)) / sum(t)
+```
+
+The overall fraction of correct predictions is 0.56. 
+The logistic regression model predicts most of upwards direction correctly. However, it predicts downwards direction poorly.
+
+> d. Now fit the logistic regression model using a training data period from
+>    1990 to 2008, with `Lag2` as the only predictor. Compute the confusion
+>    matrix and the overall fraction of correct predictions for the held out
+>    data (that is, the data from 2009 and 2010).
+
+**Answer:**
+```{r}
+training_data <- Weekly$Year < 2009
+head(training_data)
+```
+
+```{r}
+lag2_fit <- glm(Direction ~ Lag2, data = Weekly[training_data, ], family = binomial)
+```
+
+```{r}
+pred <- predict(lag2_fit, Weekly[!training_data, ], type = "response") > 0.5
+```
+
+```{r}
+t <- table(ifelse(pred, "Up (pred)", "Down (pred)"), Weekly[!training_data, ]$Direction)
+print(t)
+```
+
+```{r}
+sum(diag(t)) / sum(t)
+```
+The overall fraction of correct predictions is 0.625.
+
+
+> e. Repeat (d) using LDA.
+
+**Answer:**
+```{r}
+lda_fit <- lda(Direction ~ Lag2, data = Weekly[training_data, ])
+```
+
+```{r}
+pred <- predict(lda_fit, Weekly[!training_data, ], type = "response")$class
+```
+
+```{r}
+t <- table(pred, Weekly[!training_data, ]$Direction)
+t
+```
+
+```{r}
+sum(diag(t)) / sum(t)
+```
+The overall fraction of correct predictions is 0.625.
+
+
+> f. Repeat (d) using QDA.
+
+**Answer:**
+```{r}
+qda_fit <- qda(Direction ~ Lag2, data = Weekly[training_data, ])
+```
+
+```{r}
+pred <- predict(qda_fit, Weekly[!training_data, ], type = "response")$class
+```
+
+```{r}
+t <- table(pred, Weekly[!training_data, ]$Direction)
+t
+```
+
+```{r}
+sum(diag(t)) / sum(t)
+```
+The overall fraction of correct predictions is 0.59.
+
+
+> g. Repeat (d) using KNN with $K = 1$.
+
+**Answer:**
+```{r}
+knn_fit <- knn(
+  Weekly[training_data, "Lag2", drop = FALSE],
+  Weekly[!training_data, "Lag2", drop = FALSE],
+  Weekly$Direction[training_data]
+)
+```
+
+```{r}
+t <- table(knn_fit, Weekly[!training_data, ]$Direction)
+t
+```
+
+```{r}
+sum(diag(t)) / sum(t)
+```
+The overall fraction of correct predictions is 0.51.
+
+
+> h. Repeat (d) using naive Bayes.
+
+**Answer:**
+```{r}
+bayes_fit <- naiveBayes(Direction ~ Lag2, data = Smarket, subset = training_data)
+```
+
+```{r}
+pred <- predict(bayes_fit, Weekly[!training_data, ], type = "class")
+```
+
+```{r}
+t <- table(pred, Weekly[!training_data, ]$Direction)
+t
+```
+
+```{r}
+sum(diag(t)) / sum(t)
+```
+The overall fraction of correct predictions is 0.57.
+
+
+> i. Which of these methods appears to provide the best results on this data?
+
+**Answer:**
+
+From all the results above, logistic regression and LDA models have the highest overall fraction of correct predictions. Therefore, logistic regression and LDA provide the best results on this data.
+
+
+## Bonus question: ISL Exercise 4.8.13 Part (j) (30pts)
+> j. Experiment with different combinations of predictors, including possible
+>    transformations and interactions, for each of the methods. Report the
+>    variables, method, and associated confusion matrix that appears to provide
+>    the best results on the held out data. Note that you should also
+>    experiment with values for $K$ in the KNN classifier.
+
+**Answer:**
+Firstly, we consider each lag to see their significance:
+
+Logistic Regression with Lag1:
+```{r}
+fit_lag1 <- glm(Direction ~ Lag1, data = Weekly[training_data, ], family = binomial)
+pred <- predict(fit_lag1, Weekly[!training_data, ], type = "response") > 0.5
+```
+
+Confusion matrix:
+```{r}
+t <- table(ifelse(pred, "Up (pred)", "Down (pred)"), Weekly[!training_data, ]$Direction)
+t
+```
+
+Overall fraction of correct predictions:
+```{r}
+mean(ifelse(pred, "Up", "Down") == Weekly[!training_data, ]$Direction)
+sum(diag(t)) / sum(t)
+```
+
+Logistic Regression with Lag3:
+```{r}
+fit_lag3 <- glm(Direction ~ Lag3, data = Weekly[training_data, ], family = binomial)
+pred <- predict(fit_lag3, Weekly[!training_data, ], type = "response") > 0.5
+```
+
+Confusion matrix:
+```{r}
+t <- table(ifelse(pred, "Up (pred)", "Down (pred)"), Weekly[!training_data, ]$Direction)
+t
+```
+
+Overall fraction of correct predictions:
+```{r}
+mean(ifelse(pred, "Up", "Down") == Weekly[!training_data, ]$Direction)
+```
+
+Logistic Regression with Lag4:
+```{r}
+fit_lag4 <- glm(Direction ~ Lag4, data = Weekly[training_data, ], family = binomial)
+pred <- predict(fit_lag4, Weekly[!training_data, ], type = "response") > 0.5
+```
+
+Confusion matrix:
+```{r}
+t <- table(ifelse(pred, "Up (pred)", "Down (pred)"), Weekly[!training_data, ]$Direction)
+t
+```
+
+Overall fraction of correct predictions:
+```{r}
+mean(ifelse(pred, "Up", "Down") == Weekly[!training_data, ]$Direction)
+```
+
+Logistic Regression with Lag5:
+```{r}
+fit_lag5 <- glm(Direction ~ Lag5, data = Weekly[training_data, ], family = binomial)
+pred <- predict(fit_lag5, Weekly[!training_data, ], type = "response") > 0.5
+```
+
+Confusion matrix:
+```{r}
+t <- table(ifelse(pred, "Up (pred)", "Down (pred)"), Weekly[!training_data, ]$Direction)
+t
+```
+
+Overall fraction of correct predictions:
+```{r}
+mean(ifelse(pred, "Up", "Down") == Weekly[!training_data, ]$Direction)
+```
+
+Now we intergrate them to the model to see the predictor that we need to abandon:
+
+Logistic Regression with Lag1, Lag2, Lag3, Lag4, Lag5:
+```{r}
+fit_lag12345 <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5, data = Weekly[training_data, ], family = binomial)
+pred <- predict(fit_lag12345, Weekly[!training_data, ], type = "response") > 0.5
+```
+
+```{r}
+summary(fit_lag12345)
+```
+
+Confusion matrix:
+```{r}
+t <- table(ifelse(pred, "Up (pred)", "Down (pred)"), Weekly[!training_data, ]$Direction)
+t
+```
+
+Overall fraction of correct predictions:
+```{r}
+mean(ifelse(pred, "Up", "Down") == Weekly[!training_data, ]$Direction)
+sum(diag(t)) / sum(t)
+```
+
+Logistic Regression with Lag1, Lag2, Lag3, Lag4:
+```{r}
+fit_lag1234 <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4, data = Weekly[training_data, ], family = binomial)
+pred <- predict(fit_lag1234, Weekly[!training_data, ], type = "response") > 0.5
+```
+
+```{r}
+summary(fit_lag1234)
+```
+
+Confusion matrix:
+```{r}
+t <- table(ifelse(pred, "Up (pred)", "Down (pred)"), Weekly[!training_data, ]$Direction)
+t
+```
+
+Overall fraction of correct predictions:
+```{r}
+mean(ifelse(pred, "Up", "Down") == Weekly[!training_data, ]$Direction)
+sum(diag(t)) / sum(t)
+```
+
+As adding Lag5 will cause a smaller overall fraction of correct predictions, we will not consider it in the next following models.
+
+Now considering if we need to add Lag4:
+
+Logistic Regression with Lag1, Lag2, Lag3
+```{r}
+fit_lag123 <- glm(Direction ~ Lag1 + Lag2 + Lag3, data = Weekly[training_data, ], family = binomial)
+pred <- predict(fit_lag1234, Weekly[!training_data, ], type = "response") > 0.5
+```
+
+Confusion matrix:
+```{r}
+t <- table(ifelse(pred, "Up (pred)", "Down (pred)"), Weekly[!training_data, ]$Direction)
+t
+```
+
+Overall fraction of correct predictions:
+```{r}
+mean(ifelse(pred, "Up", "Down") == Weekly[!training_data, ]$Direction)
+sum(diag(t)) / sum(t)
+```
+
+Logistic Regression with Lag1 * Lag2 * Lag3 * Lag4:
+```{r}
+fit_lag1234_mutiply <- glm(Direction ~ Lag1 * Lag2 * Lag3 * Lag4, data = Weekly[training_data, ], family = binomial)
+pred <- predict(fit_lag1234_mutiply, Weekly[!training_data, ], type = "response") > 0.5
+```
+
+Confusion matrix:
+```{r}
+t <- table(ifelse(pred, "Up (pred)", "Down (pred)"), Weekly[!training_data, ]$Direction)
+t
+```
+
+Overall fraction of correct predictions:
+```{r}
+mean(ifelse(pred, "Up", "Down") == Weekly[!training_data, ]$Direction)
+sum(diag(t)) / sum(t)
+```
+
+Now we know that adding Lag1, Lag2, Lag3, Lag4 together in the logistic regression model provides the best results on the held out data. Therefore, we will then use all of these four predictors in the following analysis (except KNN).
+
+LDA with Lag1, Lag2, Lag3, Lag4:
+```{r}
+fit_LDA <- lda(Direction ~ Lag1 + Lag2 + Lag3 + Lag4, data = Weekly[training_data, ])
+pred <- predict(fit_LDA, Weekly[!training_data, ], type = "response")$class
+```
+
+Confusion matrix:
+```{r}
+t <- table(pred, Weekly[!training_data, ]$Direction)
+t
+```
+Overall fraction of correct predictions:
+```{r}
+mean(pred == Weekly[!training_data, ]$Direction)
+sum(diag(t)) / sum(t)
+```
+
+QDA with Lag1, Lag2, Lag3, Lag4:
+```{r}
+fit_QDA <- qda(Direction ~ Lag1 + Lag2 + Lag3 + Lag4, data = Weekly[training_data, ])
+pred <- predict(fit_QDA, Weekly[!training_data, ], type = "response")$class
+```
+
+Confusion matrix:
+```{r}
+t <- table(pred, Weekly[!training_data, ]$Direction)
+t
+```
+
+Overall fraction of correct predictions:
+```{r}
+mean(pred == Weekly[!training_data, ]$Direction)
+sum(diag(t)) / sum(t)
+```
+
+Naive Bayes with Lag1, Lag2, Lag3, Lag4:
+```{r}
+fit_bayes <- naiveBayes(Direction ~ Lag1 + Lag2 + Lag3 + Lag4, data = Weekly[training_data, ])
+pred <- predict(fit_bayes, Weekly[!training_data, ], type = "class")
+```
+
+Confusion matrix:
+```{r}
+t <- table(pred, Weekly[!training_data, ]$Direction)
+t
+```
+
+Overall fraction of correct predictions:
+```{r}
+mean(pred == Weekly[!training_data, ]$Direction)
+sum(diag(t)) / sum(t)
+```
+
+KNN:
+We test from lag1 to lag5:
+```{r}
+set.seed(123456)
+for (i in 3:6){
+correctness <- sapply(1:50, function(k) {
+  fit_knn_trial <- knn(
+    Weekly[training_data, 2:i, drop = FALSE],
+    Weekly[!training_data, 2:i, drop = FALSE],
+    Weekly$Direction[training_data],
+    k = k
+  )
+  mean(fit_knn_trial == Weekly[!training_data, ]$Direction)
+})
+plot(1:50, correctness, type = "o", xlab = "k", ylab = "Fraction correct")
+print(paste("Lag1 to Lag", i-1, "- max correctness is:", max(correctness)))
+}
+```
+
+From above result, we know that the first three lag variables are the best. Then we find the best k:
+```{r}
+correctness <- sapply(1:50, function(k) {
+  fit_knn_trial <- knn(
+    Weekly[training_data, 2:4, drop = FALSE],
+    Weekly[!training_data, 2:4, drop = FALSE],
+    Weekly$Direction[training_data],
+    k = k
+  )
+  mean(fit_knn_trial == Weekly[!training_data, ]$Direction)
+})
+k <- which.max(correctness)
+k
+```
+
+The best k is 22. Then we use the best k to fit the model:
+```{r}
+set.seed(123)
+fit_knn <- knn(
+  Weekly[training_data, 2:4, drop = FALSE],
+  Weekly[!training_data, 2:4, drop = FALSE],
+  Weekly$Direction[training_data],
+  k = k
+)
+```
+
+Confusion matrix:
+```{r}
+t <- table(fit_knn, Weekly[!training_data, ]$Direction)
+t
+```
+
+Overall fraction of correct predictions:
+```{r}
+mean(fit_knn == Weekly[!training_data, ]$Direction)
+sum(diag(t)) / sum(t)
+```
+
+Conclusion: KNN with the first 3 Lag variables performs best when the $k$ is 22.
+
+
+## Bonus question: ISL Exercise 4.8.4 (30pts)
+> When the number of features $p$ is large, there tends to be a deterioration
+> in the performance of KNN and other _local_ approaches that perform
+> prediction using only observations that are _near_ the test observation for
+> which a prediction must be made. This phenomenon is known as the
+> _curse of dimensionality_, and it ties into the fact that non-parametric
+> approaches often perform poorly when $p$ is large. We will now investigate
+> this curse.
+>
+> a. Suppose that we have a set of observations, each with measurements on
+>    $p = 1$ feature, $X$. We assume that $X$ is uniformly (evenly) distributed
+>    on $[0, 1]$. Associated with each observation is a response value. Suppose
+>    that we wish to predict a test observation's response using only
+>    observations that are within 10% of the range of $X$ closest to that test
+>    observation. For instance, in order to predict the response for a test
+>    observation with $X = 0.6$, we will use observations in the range
+>    $[0.55, 0.65]$. On average, what fraction of the available observations
+>    will we use to make the prediction?
+
+**Answer:**
+For values from $0$ to $0.05$ or from $0.95$ to $1$, we will use less than 10% of observations since there is a boundary, which is between 5% and 10%. Thus, we will calculate it as 7.5% on average for these two parts. 
+For values from $0.05$ to $0.95$ we will use 10% of observations, as no boundary on the two sides. 
+Therefore, The fraction of the available observations on average is 
+$$
+7.5percent \times 0.1 + 10percent \times 0.9 = 9.75percent
+$$
+The fraction is 9.75% on average.
+
+
+> b. Now suppose that we have a set of observations, each with measurements on
+>    $p = 2$ features, $X_1$ and $X_2$. We assume that $(X_1, X_2)$ are
+>    uniformly distributed on $[0, 1] \times [0, 1]$. We wish to predict a test
+>    observation's response using only observations that are within 10% of the
+>    range of $X_1$ _and_ within 10% of the range of $X_2$ closest to that test
+>    observation. For instance, in order to predict the response for a test
+>    observation with $X_1 = 0.6$ and $X_2 = 0.35$, we will use observations in
+>    the range $[0.55, 0.65]$ for $X_1$ and in the range $[0.3, 0.4]$ for $X_2$.
+>    On average, what fraction of the available observations will we use to
+>    make the prediction?
+
+**Answer:**
+As the observations are required to be within range for both $X_1$ and $X_2$, we square the fraction of 9.75% as calculated in question (a).
+Therefore, the result of fraction is $0.0975^2 \times 100 = 0.95\%$
+
+> c. Now suppose that we have a set of observations on $p = 100$ features. Again
+>    the observations are uniformly distributed on each feature, and again each
+>    feature ranges in value from 0 to 1. We wish to predict a test
+>    observation's response using observations within the 10% of each feature's
+>    range that is closest to that test observation. What fraction of the
+>    available observations will we use to make the prediction?
+
+**Answer:**
+Similar to our previous process, the fraction for p = 100 is: $0.0975^{100} \times 100 = 8 \times 10^{-100}\%$, which is almost zero.
+
+> d. Using your answers to parts (a)--(c), argue that a drawback of KNN when
+>    $p$ is large is that there are very few training observations "near" any
+>    given test observation.
+
+**Answer:**
+With the increase of $p$, the fraction of the available observations will be decreased rapidly with the exponential speed, even if the range is large.
+
+> e. Now suppose that we wish to make a prediction for a test observation by
+>    creating a $p$-dimensional hypercube centered around the test observation
+>    that contains, on average, 10% of the training observations. For
+>    $p = 1,2,$ and $100$, what is the length of each side of the hypercube?
+>    Comment on your answer.
+>
+> _Note: A hypercube is a generalization of a cube to an arbitrary number of_
+> _dimensions. When $p = 1$, a hypercube is simply a line segment, when $p = 2$_
+> _it is a square, and when $p = 100$ it is a 100-dimensional cube._
+
+**Answer:**
+When $p = 1$, the length is 0.1.
+When $p = 2$, we have $l$ which follows $l^2 = 0.1$, so
+$l = \sqrt{0.1} = 0.32$.
+When $p = n$, $l = 0.1^{1/n}$, 
+so when $n = 100$, $l = 0.98$.
+Therefore, the length of each side of the hypercube will approach 1 with the increase of $p$.

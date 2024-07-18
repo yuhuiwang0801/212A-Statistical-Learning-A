@@ -1,0 +1,577 @@
+---
+title: "Biostat 212a Homework 1"
+subtitle: "Due Jan 23, 2024 @ 11:59PM"
+author: "Yuhui Wang, UID: 606332401"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+format:
+  html:
+    theme: cosmo
+    embed-resources: true
+    number-sections: true
+    toc: true
+    toc-depth: 4
+    toc-location: left
+    code-fold: false
+engine: knitr
+knitr:
+  opts_chunk: 
+    fig.align: 'center'
+    # fig.width: 6
+    # fig.height: 4
+    message: FALSE
+    cache: false
+---
+
+## Filling gaps in lecture notes (10pts)
+
+Consider the regression model
+$$
+Y = f(X) + \epsilon,
+$$
+where $\operatorname{E}(\epsilon) = 0$. 
+
+
+### Optimal regression function
+
+Show that the choice
+$$
+f_{\text{opt}}(X) = \operatorname{E}(Y | X)
+$$
+minimizes the mean squared prediction error
+$$
+\operatorname{E}[Y - f(X)]^2,
+$$
+where the expectations averages over variations in both $X$ and $Y$. (Hint: condition on $X$.)
+
+**Answer:**
+Since $\operatorname{E}(\epsilon) = 0$, we have:
+$$
+\begin{align}
+\operatorname{E}[Y - f(X)]^2 &= {E}[Y^2-2Yf(X)+f^2(X)] \\
+&= \operatorname{E}[Y^2] + \operatorname{E}[f^2(X)-2Yf(X)] \\
+\end{align}
+$$
+To minimize the mean squared prediction error, we need to minimize $\operatorname{E}[f^2(X)-2Yf(X)]$. Then we take the derivative of $\operatorname{E}[f^2(X)-2Yf(X)]$ with respect to $f(X)$ and set it to 0, which is:
+$$
+2f(X) - 2Y = 0
+$$
+Therefore, the result for $f_{\text{opt}}(X)$ is:
+$$
+\begin{align}
+f_{\text{opt}}(X) &= Y \\
+&= \operatorname{E}(Y | X)
+\end{align}
+$$
+
+### Bias-variance trade-off
+
+Given an estimate $\hat f$ of $f$, show that the test error at a $x_0$ can be decomposed as
+$$
+\operatorname{E}[y_0 - \hat f(x_0)]^2 = \underbrace{\operatorname{Var}(\hat f(x_0)) + [\operatorname{Bias}(\hat f(x_0))]^2}_{\text{MSE of } \hat f(x_0) \text{ for estimating } f(x_0)} + \underbrace{\operatorname{Var}(\epsilon)}_{\text{irreducible}},
+$$
+where the expectation averages over the variability in $y_0$ and $\hat f$.
+
+**Answer:**
+$$
+\begin{align}
+\operatorname{E}[y_0 - \hat f(x_0)]^2 &= \operatorname{E}[(y_0 - f(x_0) + f(x_0) - \hat f(x_0))^2] \\
+&= \operatorname{E}[(y_0 - f(x_0))^2] + 2\operatorname{E}[(y_0 - f(x_0)(f(x_0) - \hat f(x_0)] + \operatorname{E}[(f(x_0) - \hat f(x_0))^2 ] 
+\end{align}
+$$
+For this equation, the first term is:
+$$
+\begin{align}
+\operatorname{E}[(y_0 - f(x_0))^2] &= \operatorname{E}[(f(x_0) + \epsilon - f(x_0))^2] \\
+&= \operatorname{E}[\epsilon^2] \\
+\end{align}
+$$
+For the second term, since $$y_0 - f(x_0) = \epsilon$$ and $$\operatorname{E}(\epsilon) = 0$$, we have:
+$$
+\begin{align}
+\operatorname{E}[(y_0 - f(x_0)(f(x_0) - \hat f(x_0)] = 0
+\end{align}
+$$
+For the third term, we have:
+$$
+\begin{align}
+\operatorname{E}[(f(x_0) - \hat f(x_0))^2 ] &= \operatorname{E}[(f(x_0) - \operatorname{E}(\hat f(x_0)) + \operatorname{E}(\hat f(x_0)) - \hat f(x_0))^2 ] \\
+&= \operatorname{E}[(f(x_0) - \operatorname{E}(\hat f(x_0)))^2] + 2\operatorname{E}[(f(x_0) - \operatorname{E}(\hat f(x_0)))(\operatorname{E}(\hat f(x_0)) - \hat f(x_0))] + \operatorname{E}[(\operatorname{E}(\hat f(x_0)) - \hat f(x_0))^2] \\
+&= \operatorname{E}[(f(x_0) - \operatorname{E}(\hat f(x_0)))^2] + \operatorname{E}[(\operatorname{E}(\hat f(x_0)) - \hat f(x_0))^2] \\
+&= \operatorname{Var}(\hat f(x_0)) + [\operatorname{Bias}(\hat f(x_0))]^2
+\end{align}
+$$
+Therefore, we have:
+$$
+\begin{align}
+\operatorname{E}[y_0 - \hat f(x_0)]^2 &= \operatorname{E}[\epsilon^2] + \operatorname{Var}(\hat f(x_0)) + [\operatorname{Bias}(\hat f(x_0))]^2 \\
+&= \operatorname{Var}(\epsilon) + \operatorname{Var}(\hat f(x_0)) + [\operatorname{Bias}(\hat f(x_0))]^2
+\end{align}
+$$
+
+## ISL Exercise 2.4.3 (10pts)
+3. We now revisit the bias-variance decomposition.
+(a) Provide a sketch of typical (squared) bias, variance, training error, test error, and Bayes (or irreducible) error curves, on a single plot, as we go from less flexible statistical learning methods towards more flexible approaches. The x-axis should represent
+the amount of flexibility in the method, and the y-axis should
+represent the values for each curve. There should be five curves.
+Make sure to label each one.
+
+**Answer:**
+```{r}
+# Define the model flexibility range
+flexibility <- seq(1, 100, length.out = 400)
+
+# Assuming some arbitrary functions for demonstration purposes:
+squared_bias <- (1 / (1 + exp(0.1 * (flexibility - 50))))^2
+variance <- (1 - 1 / (1 + exp(0.1 * (flexibility - 50))))^2
+training_error <- 1 / (1 + exp(0.1 * (flexibility - 20)))
+test_error <- training_error - 0.1 + variance + squared_bias
+bayes_error <- rep(0.2, 400)
+
+# Plot
+plot(flexibility, training_error, type = "l", col = "red", ylim = c(0, 1), xlab = "Flexibility", ylab = "Error", main = "Bias-Variance Tradeoff")
+lines(flexibility, test_error, col = "orange")
+lines(flexibility, squared_bias, col = "green")
+lines(flexibility, variance, col = "blue")
+lines(flexibility, bayes_error, col = "purple")
+
+# Add legend
+legend("topright", inset=.05, cex=0.8, title="Error Type", c("Training", "Test", "Squared Bias", "Variance", "Bayes"), fill=c("red", "orange", "green", "blue", "purple"), horiz=FALSE)
+```
+
+(b) Explain why each of the five curves has the shape displayed in
+part (a).
+
+**Answer:**
+*Squared Bias*: Decreases with flexibility since more flexible models can adapt better to complex data patterns.
+
+*Variance*: Increases with flexibility as more flexible models are more sensitive to fluctuations in the training data.
+
+*Training Error*: Decreases with flexibility as the model fits the training data more closely.
+
+*Test Error*: Initially decreases with increasing flexibility but then increases due to overfitting (reflected in the U-shape).
+
+*Bayes Error*: Remains constant as it represents the error inherent in the data that cannot be reduced by any model.
+
+## ISL Exercise 2.4.4 (10pts)
+4. You will now think of some real-life applications for statistical learning.
+(a) Describe three real-life applications in which classifcation might
+be useful. Describe the response, as well as the predictors. Is the
+goal of each application inference or prediction? Explain your
+answer.
+(b) Describe three real-life applications in which regression might
+be useful. Describe the response, as well as the predictors. Is the
+goal of each application inference or prediction? Explain your
+answer.
+(c) Describe three real-life applications in which cluster analysis
+might be useful.
+
+**Answer:**
+
+(a)
+Classification:
+
+1. **Medical Diagnosis**
+
+*Response*: Whether a patient has a certain disease or not
+
+*Predictors*: symptoms, disease history, demographic information
+
+*Goal*: It can be both a prediction problem and an inference problem. We can use the model to predict whether a patient has the disease or not. We can also use the model to identify the which predictors are significant for the disease.
+
+2. **Spam Detection**
+
+*Response*: Whether an email is spam or not
+
+*Predictors*: email content, email address format, email time
+
+*Goal*: It is a prediction problem. We want to use the model to predict whether an email is a spam or not.
+
+3. **Credit Loan Approval**
+
+*Response*: Whether a person is qualified for a credit loan or not
+
+*Predictors*: credit history, income, demographic information
+
+*Goal*: It is a prediction problem. We want to use the model to predict whether a person is qualified for a credit loan or not.
+
+(b)
+Regression:
+1. **Housing Price Prediction**
+*Response*: Housing price
+*Predictors*: house size, house location, house age
+*Goal*: It is a prediction problem. We want to use the model to predict the housing price.
+2. **Auto Insurance Price Prediction**
+*Response*: Auto insurance price
+*Predictors*: car model, car age, car owner's age
+*Goal*: It is a prediction problem. We want to use the model to predict the auto insurance price.
+3. **Stock Price Prediction**
+*Response*: Stock price
+*Predictors*: stock history price, stock company's financial report, stock company's news
+*Goal*: It is a prediction problem. We want to use the model to predict the stock price.
+
+(c)
+Cluster Analysis:
+1. **Crime Analysis**
+Group crime data into different clusters based on the crime type, crime location, crime time, etc.
+
+2. **Customer Segmentation**
+Group customers into different clusters based on their demographic information, purchase history, etc.
+
+3. **Document Classification**
+Group documents into different clusters based on their content, type, author, etc.
+
+## ISL Exercise 2.4.10 (30pts)
+
+Your can read in the `boston` data set directly from url <https://raw.githubusercontent.com/biostat212a/2024winter/master/slides/data/Boston.csv>. A documentation of the `boston` data set is [here](https://www.rdocumentation.org/packages/ISLR2/versions/1.3-2/topics/Boston).
+
+::: {.panel-tabset}
+
+#### R
+This exercise involves the Boston housing data set.
+(a) To begin, load in the Boston data set. The Boston data set is
+part of the ISLR2 library.
+
+```{r}
+library(ISLR2)
+head(Boston)
+?Boston
+dim(Boston)
+```
+
+How many rows are in this data set? How many columns? What
+do the rows and columns represent?
+
+**Answer:**
+There are 506 rows and 13 columns in the data set. The rows represent the census tracts in Boston (or the observations). The columns represent the predictors.
+
+(b) Make some pairwise scatterplots of the predictors (columns) in
+this data set. Describe your findings.
+
+**Answer:**
+```{r}
+library(GGally)
+pairs(Boston)
+pairs(~crim+nox+dis+tax+medv, data = Boston)
+```
+From the graph, we can see that some predictors have a strong relationship, for example,  `crim` have a negative linear relationship with `medv` and `dis`. Also, `nox` has a negative linear relationship with `dis`, and `dis` has a positive linear relationship with `medv`. However, some predictors have a non-linear relationship, such as `dis` and `age`.
+
+(c) Are any of the predictors associated with per capita crime rate?
+If so, explain the relationship.
+
+**Answer:**
+Yes. From the graph, we can see that `crim` have a strong negative relationship with `medv` and `dis`. When `crim` increases, `medv` and `dis` decreases. Also, `crim` has a positive linear relationship with `nox` and `tax`. When `crim` increases, `nox` and `tax` increases.
+
+(d) Do any of the census tracts of Boston appear to have particularly
+high crime rates? Tax rates? Pupil-teacher ratios? Comment on
+the range of each predictor.
+
+**Answer:**
+```{r}
+plot(Boston$crim)
+plot(Boston$tax)
+plot(Boston$ptratio)
+range(Boston$crim)
+range(Boston$tax)
+range(Boston$ptratio)
+```
+
+Yes. From the graph, we can see that some census tracts have particularly high crime rates, tax rates, and pupil-teacher ratios. The range of each predictor is different. For example, the range of `crim` is from 0.00632 to 88.97620, the range of `tax` is from 187 to 711, and the range of `ptratio` is from 12.6 to 22.0.
+
+(e) How many of the census tracts in this data set bound the Charles
+river?
+
+**Answer:**
+```{r}
+sum(Boston$chas == 1)
+```
+35 are bounded by the Charles river.
+
+(f) What is the median pupil-teacher ratio among the towns in this
+data set?
+
+**Answer:**
+```{r}
+median(Boston$ptratio)
+```
+The median pupil-teacher ratio is 19.05.
+
+(g) Which census tract of Boston has lowest median value of owneroccupied homes? What are the values of the other predictors for that census tract, and how do those values compare to the overall ranges for those predictors? Comment on your findings.
+
+**Answer:**
+```{r}
+which(Boston$medv == min(Boston$medv))
+Boston[which(Boston$medv == min(Boston$medv)), ]
+pairs(Boston)
+```
+The census tracts of Boston that have the lowest median value of owner-occupied homes are 399 and 406. 
+
+The values of the other predictors for '399' census tract are: crim = 38.3518, zn = 0, indus = 18.1, chas = 0, nox = 0.693, rm = 5.453, age = 100, dis = 1.4896, rad = 24, tax = 666, ptratio = 20.2, black = 396.9, lstat = 30.59, medv = 5.0. 
+
+For '406', the values are: crim = 67.9208, zn = 0, indus = 18.1, chas = 0, nox = 0.693, rm = 5.683, age = 100, dis = 1.4254, rad = 24, tax = 666, ptratio = 20.2, lstat = 22.98, medv = 5.0. The values of the other predictors for these two census tracts are at the lower end of the range of the predictors.
+
+For these two census tracts, compared to overall range, the values of `crim`, `nox`, `age`, `dis`, `rad`, `tax`, `ptratio`, and `lstat` are at the higher end of the range of the predictors. The value of `rm` is at the lower end of the range of the predictors.
+
+
+(h) In this data set, how many of the census tracts average more than
+seven rooms per dwelling? More than eight rooms per dwelling?
+Comment on the census tracts that average more than eight
+rooms per dwelling.
+
+**Answer:**
+```{r}
+sum(Boston$rm > 7)
+sum(Boston$rm > 8)
+Boston[Boston$rm > 8, ]
+print("Boston")
+summary(Boston)
+print("Boston[Boston$rm > 8, ]")
+summary(Boston[Boston$rm > 8, ])
+pairs(Boston)
+```
+64 census tracts have average of more than seven rooms per dwelling. 13 census tracts have average of more than eight rooms per dwelling. The census tracts that average more than eight rooms per dwelling have a low crime rate `crim`, a low pupil-teacher ratio `lstat`, and a high median value of owner-occupied homes `medv`.
+
+Additional Information:
+```{r}
+library(tidyverse)
+
+Boston <- read_csv("https://raw.githubusercontent.com/ucla-biostat-212a/2024winter/master/slides/data/Boston.csv", col_select = -1) %>% 
+  print(width = Inf)
+```
+
+#### Python
+
+```{python}
+import pandas as pd
+import io
+import requests
+
+url = "https://raw.githubusercontent.com/ucla-econ-425t/2023winter/master/slides/data/Boston.csv"
+s = requests.get(url).content
+Boston = pd.read_csv(io.StringIO(s.decode('utf-8')), index_col = 0)
+Boston
+```
+
+
+:::
+
+## ISL Exercise 3.7.3 (12pts)
+3. Suppose we have a data set with fve predictors, X1 = GPA, X2 =
+IQ, X3 = Level (1 for College and 0 for High School), X4 = Interaction between GPA and IQ, and X5 = Interaction between GPA and Level. The response is starting salary after graduation (in thousands
+of dollars). Suppose we use least squares to ft the model, and get
+βˆ0 = 50, βˆ1 = 20, βˆ2 = 0.07, βˆ3 = 35, βˆ4 = 0.01, βˆ5 = −10.
+
+(a) Which answer is correct, and why?
+i. For a fixed value of IQ and GPA, high school graduates earn
+more, on average, than college graduates.
+
+ii. For a fixed value of IQ and GPA, college graduates earn
+more, on average, than high school graduates.
+
+iii. For a fixed value of IQ and GPA, high school graduates earn
+more, on average, than college graduates provided that the
+GPA is high enough.
+
+iv. For a fixed value of IQ and GPA, college graduates earn
+more, on average, than high school graduates provided that
+the GPA is high enough.
+
+**Answer:**
+'iv' is correct, and here is the reason:
+
+Salary for high school graduates: 50 + 20* GPA + 0.07 * IQ + 0.01 * (IQ * GPA)
+
+Salary for college graduates: 50 + 20* GPA + 0.07 * IQ + 35 + 0.01 * (IQ * GPA) - 10 * GPA = 85 + 10* GPA + 0.07 * IQ + 0.01 * (IQ * GPA)
+
+When IQ and GPA are fixed, Salary for college graduates - Salary for high school graduates = 35 - 10 * GPA. If GPA is high enough (for example, 4), Salary for college graduates minus Salary for high school graduates will be less than 0. 
+
+Therefore, high school graduates earn more, on average, than college graduates provided that the GPA is high enough.
+
+
+(b) Predict the salary of a college graduate with IQ of 110 and a
+GPA of 4.0.
+
+**Answer:**
+```{r}
+salary <- 50 + 20 * 4 + 0.07 * 110 + 35 + 0.01 * 4 * 110 - 10 * 4
+salary
+```
+The salary is 137.1 K.
+
+(c) True or false: Since the coefficient for the GPA/IQ interaction
+term is very small, there is very little evidence of an interaction
+effect. Justify your answer.
+
+**Answer:**
+False. The coefficient represents a slope or a rate of change. It does not affect the statistical significance of the interaction effect. P-value is the criteria to determine the statistical significance.
+
+## ISL Exercise 3.7.15 (20pts)
+15. This problem involves the Boston data set, which we saw in the lab
+for this chapter. We will now try to predict per capita crime rate
+using the other variables in this data set. In other words, per capita
+crime rate is the response, and the other variables are the predictors.
+(a) For each predictor, fit a simple linear regression model to predict
+the response. Describe your results. In which of the models is
+there a statistically significant association between the predictor
+and the response? Create some plots to back up your assertions.
+
+**Answer:**
+```{r}
+library(ISLR2)
+library(ggplot2)
+predictors <- colnames(Boston)[colnames(Boston) != "crim"]
+models <- list()
+for (pred in predictors) {
+  model_formula <- as.formula(paste("crim ~", pred))
+  models[[pred]] <- lm(model_formula, data = Boston)
+}
+
+for (i in predictors) {
+  print(i)
+  print(summary(models[[i]]))
+}
+```
+Results: From the model summary, `zn`, `indus`, `nox`, `rm`, `age`, `dis`, `rad`, `tax`, `ptratio`, `lstat` have statistically significant association with `crim`. However, `chas` does not have statistically significant association with `crim`, as `chas` is a dummy variable.
+
+Plots:
+```{r}
+for (pred in predictors) {
+  plot <- ggplot(Boston, aes_string(x = pred, y = "crim")) +
+    geom_point() +
+    geom_smooth(method = "lm", se = FALSE) +
+    ggtitle(paste("CRIM vs", pred))
+  
+  print(plot)
+}
+```
+
+
+(b) Fit a multiple regression model to predict the response using
+all of the predictors. Describe your results. For which predictors
+can we reject the null hypothesis H0 : βj = 0?
+
+**Answer:**
+```{r}
+model_f <- as.formula(paste("crim ~", paste(predictors, collapse = "+")))
+model <- lm(model_f, data = Boston)
+summary(model)
+```
+Results: We can reject the null hypothesis for `zn`, `dis`, `rad`, `medv` at alpha = 0.05 level, and we can reject the null hypothesis for `nox`, `lstat` at alpha = 0.1 level. Other predictors do not have statistically significant association with `crim` at alpha = 0.01 level.
+
+(c) How do your results from (a) compare to your results from (b)?
+Create a plot displaying the univariate regression coefficients
+from (a) on the x-axis, and the multiple regression coefficients
+from (b) on the y-axis. That is, each predictor is displayed as a
+single point in the plot. Its coefficient in a simple linear regression model is shown on the x-axis, and its coefficient estimate in the multiple linear regression model is shown on the y-axis.
+
+**Answer:**
+```{r}
+predictors <- colnames(Boston)[colnames(Boston) != "crim"]
+simple_models <- lapply(predictors, function(pred) {
+  lm(as.formula(paste("crim ~", pred)), data = Boston)
+})
+
+# Extract coefficients from simple linear regression models
+simple_coefs <- sapply(simple_models, function(model) coef(model)[2])
+
+# Fit multiple linear regression model with all predictors
+multiple_model <- lm(crim ~ ., data = Boston)
+multiple_coefs <- coef(multiple_model)[-1] # Exclude intercept
+
+# Create a data frame for plotting
+coef_comparison <- data.frame(
+  simple_df = simple_coefs,
+  multiple_df = multiple_coefs[names(simple_coefs)],
+  Predictor = names(simple_coefs)
+)
+```
+For each predictors with `crim`, they have a statistically significant association with `crim` at alpha = 0.05 level. However, in the multiple regression model, only `zn`, `dis`, `rad`, `medv` have statistically significant association with `crim` at alpha = 0.05 level. Other predictors do not have statistically significant association with `crim` at alpha = 0.05 level.
+```{r}
+# Plot the comparison of coefficients
+ggplot(coef_comparison, aes(x = simple_df, y = multiple_df)) +
+  geom_point() +
+  geom_text(aes(label = Predictor), vjust = 1.5, hjust = 1.5, check_overlap = TRUE) +
+  xlab("Coefficient in Simple Linear Regression") +
+  ylab("Coefficient in Multiple Linear Regression") +
+  ggtitle("Comparison of Regression Coefficients") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+(d) Is there evidence of non-linear association between any of the
+predictors and the response? To answer this question, for each
+predictor X, fit a model of the form
+Y = β0 + β1X + β2X2 + β3X3 + epsilon.
+
+**Answer:**
+```{r}
+
+# Initialize a list to store polynomial models
+poly_models <- list()
+
+# Fit a cubic polynomial model for each predictor
+for (pred in predictors) {
+  poly_formula <- as.formula(paste("crim ~ poly(", pred, ", 3, raw = TRUE)"))
+  poly_models[[pred]] <- lm(poly_formula, data = Boston)
+}
+
+# Summarize and check each polynomial model
+for (pred in predictors) {
+  print(paste("Polynomial Model Summary for Predictor:", pred))
+  print(summary(poly_models[[pred]]))
+}
+```
+
+Yes. In general, there is evidence of non-linear association between `crim` and `indus`, `nox`, `age`, `dis`, `ptratio`, `medv`.
+
+For degree 1 coefficients, at alpha = 0.05 level, `zn`, `indus`, `nox`, `dis`, `ptratio`, `medv` have statistically significant association with `crim`. 
+
+For degree 2 coefficients, at alpha = 0.05 level, `indus`, `nox`, `age`, `dis`, `ptratio`, `medv` have statistically significant association with `crim`.
+
+For degree 3 coefficients, at alpha = 0.05 level, `indus`, `nox`, `age`, `dis`, `ptratio`, `medv` have statistically significant association with `crim`.
+
+
+## Bonus question (20pts)
+
+For multiple linear regression, show that $R^2$ is equal to the correlation between the response vector $\mathbf{y} = (y_1, \ldots, y_n)^T$ and the fitted values $\hat{\mathbf{y}} = (\hat y_1, \ldots, \hat y_n)^T$. That is
+$$
+R^2 = 1 - \frac{\text{RSS}}{\text{TSS}} = [\operatorname{Cor}(\mathbf{y}, \hat{\mathbf{y}})]^2.
+$$
+
+**Answer:**
+$R^2$, in the context of multiple linear regression, is defined as:
+$$
+\begin{equation}
+    R^2 = 1 - \frac{\text{RSS}}{\text{TSS}},
+\end{equation}
+$$
+where RSS is the Residual Sum of Squares and TSS is the Total Sum of Squares.
+
+The Pearson correlation coefficient between two vectors $\mathbf{y}$ and $\hat{\mathbf{y}}$ is defined as:
+$$
+\begin{equation}
+    \operatorname{Cor}(\mathbf{y}, \hat{\mathbf{y}}) = \frac{\sum_{i=1}^{n}(y_i - \bar{y})(\hat{y}_i - \bar{\hat{y}})}{\sqrt{\sum_{i=1}^{n}(y_i - \bar{y})^2} \sqrt{\sum_{i=1}^{n}(\hat{y}_i - \bar{\hat{y}})^2}},
+\end{equation}
+$$
+where $\bar{y}$ and $\bar{\hat{y}}$ are the means of $\mathbf{y}$ and $\hat{\mathbf{y}}$, respectively.
+
+The mean of the fitted values $\bar{\hat{y}}$ equals the mean of the observed values $\bar{y}$. Therefore, we can express the Total Sum of Squares (TSS) also in terms of the predicted values:
+$$
+\begin{equation}
+    \text{TSS} = \sum_{i=1}^{n}(\hat{y}_i - \bar{\hat{y}})^2 + \text{RSS}.
+\end{equation}
+$$
+Given that $\bar{y} = \bar{\hat{y}}$, the correlation coefficient simplifies to:
+$$
+\begin{equation}
+    \operatorname{Cor}(\mathbf{y}, \hat{\mathbf{y}}) = \frac{\sqrt{\text{TSS} - \text{RSS}}}{\sqrt{\text{TSS}}}.
+\end{equation}
+$$
+Squaring this correlation coefficient, we obtain:
+$$
+\begin{equation}
+    [\operatorname{Cor}(\mathbf{y}, \hat{\mathbf{y}})]^2 = \left( \frac{\sqrt{\text{TSS} - \text{RSS}}}{\sqrt{\text{TSS}}} \right)^2 = \frac{\text{TSS} - \text{RSS}}{\text{TSS}} = 1 - \frac{\text{RSS}}{\text{TSS}} = R^2.
+\end{equation}
+$$
+Therefore, $R^2$ is indeed equal to the square of the correlation between the observed values and the fitted values in multiple linear regression.
+

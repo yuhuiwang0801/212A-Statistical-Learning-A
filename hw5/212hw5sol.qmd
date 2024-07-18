@@ -1,0 +1,495 @@
+---
+title: "Biostat 212a Homework 5"
+subtitle: "Due Mar 11, 2024 @ 11:59PM"
+author: "Yuhui Wang, UID: 606332401"
+date: today
+format:
+  html:
+    theme: cosmo
+    embed-resources: true
+    number-sections: true
+    toc: true
+    toc-depth: 4
+    toc-location: left
+    code-fold: false
+engine: knitr
+knitr:
+  opts_chunk: 
+    fig.align: 'center'
+    # fig.width: 6
+    # fig.height: 4
+    message: FALSE
+    cache: false
+---
+
+## ISL Exercise 9.7.1 (10pts)
+> This problem involves hyperplanes in two dimensions.
+>
+> a. Sketch the hyperplane $1 + 3X_1 − X_2 = 0$. Indicate the set of points for
+>    which $1 + 3X_1 − X_2 > 0$, as well as the set of points for which
+>    $1 + 3X_1 − X_2 < 0$.
+
+```{r}
+library(ggplot2)
+xlim <- c(-10, 10)
+ylim <- c(-20, 20)
+points <- expand.grid(
+  X1 = seq(xlim[1], xlim[2], length.out = 50), 
+  X2 = seq(ylim[1], ylim[2], length.out = 50)
+)
+
+#hyperplane
+plane <- ggplot(points, aes(x = X1, y = X2)) + 
+  geom_abline(intercept = 1, slope = 3) +  
+  theme_bw()
+
+plane + geom_point(aes(color = 1 + 3*X1 - X2 > 0), size = 0.1) + 
+  scale_color_discrete(name = "1 + 3X1 − X2 > 0")
+```
+
+> b. On the same plot, sketch the hyperplane $−2 + X_1 + 2X_2 = 0$. Indicate the
+>    set of points for which $−2 + X_1 + 2X_2 > 0$, as well as the set of points
+>    for which $−2 + X_1 + 2X_2 < 0$.
+
+```{r}
+plane + geom_abline(intercept = 1, slope = -1/2) +  # X2 = 1 - X1/2
+  geom_point(
+    aes(color = interaction(1 + 3*X1 - X2 > 0, -2 + X1 + 2*X2 > 0)), 
+    size = 0.2
+  ) + 
+  scale_color_discrete(name = "(1 + 3X1 − X2 > 0).(−2 + X1 + 2X2 > 0)")
+```
+
+## ISL Exercise 9.7.2 (10pts)
+> We have seen that in $p = 2$ dimensions, a linear decision boundary takes the
+> form $\beta_0 + \beta_1X_1 + \beta_2X_2 = 0$. We now investigate a non-linear
+> decision boundary.
+>
+> a. Sketch the curve $$(1+X_1)^2 +(2−X_2)^2 = 4$$.
+
+```{r}
+points <- expand.grid(
+  X1 = seq(-4, 2, length.out = 50), 
+  X2 = seq(-1, 5, length.out = 50)
+)
+plane <- ggplot(points, aes(x = X1, y = X2, 
+                            z = (1 + X1)^2 + (2 - X2)^2 - 4)) + 
+  geom_contour(breaks = 0, colour = "black") + 
+  theme_bw()
+plane
+```
+
+> b. On your sketch, indicate the set of points for which
+>    $$(1 + X_1)^2 + (2 − X_2)^2 > 4,$$ as well as the set of points for which
+>    $$(1 + X_1)^2 + (2 − X_2)^2 \leq 4.$$
+
+```{r}
+plane + geom_point(aes(color = (1 + X1)^2 + (2 - X2)^2 - 4 > 0), 
+                   size = 0.1)
+```
+
+> c. Suppose that a classifier assigns an observation to the blue class if $$(1
+>    + X_1)^2 + (2 − X_2)^2 > 4,$$ and to the red class otherwise. To what class
+>    is the observation $(0, 0)$ classified? $(−1, 1)$? $(2, 2)$? $(3, 8)$?
+
+```{r}
+points <- data.frame(
+  X1 = c(0, -1, 2, 3),
+  X2 = c(0, 1, 2, 8)
+)
+print(ifelse((1 + points$X1)^2 + (2 - points$X2)^2 > 4, "blue", "red"))
+```
+
+> d. Argue that while the decision boundary in (c) is not linear in terms of
+>    $X_1$ and $X_2$, it is linear in terms of $X_1$, $X_1^2$, $X_2$, and
+>    $X_2^2$.
+
+For this question, the decision boundary is defined as:
+$$(1 + X_1)^2 + (2 − X_2)^2 -4 = 0$$ 
+And we can expand the equation to:
+$$1 + 2X_1 + X_1^2 + 4 − 4X_2 + X_2^2 - 4 = 0$$
+For this equation, it is linear in terms of $X_1$, $X_1^2$, $X_2$, $X_2^2$.
+
+
+## Support vector machines (SVMs) on the `Carseats` data set (30pts)
+
+Follow the machine learning workflow to train support vector classifier (same as SVM with linear kernel), SVM with polynomial kernel (tune the degree and regularization parameter $C$), and SVM with radial kernel (tune the scale parameter $\gamma$ and regularization parameter $C$) for classifying `Sales<=8` versus `Sales>8`. Use the same seed as in your HW4 for the initial test/train split and compare the final test AUC and accuracy to those methods you tried in HW4.
+
+```{r}
+library(ISLR2)
+library(GGally)
+library(gtsummary)
+library(kernlab)
+library(tidyverse)
+library(tidymodels)
+```
+
+Initial split into test and non-test sets:
+
+```{r}
+Carseats <- Carseats %>%
+  mutate(Sales = ifelse(Sales <= 8, "Low", "High")) 
+Carseats %>% tbl_summary(by = Sales)
+```
+
+```{r}
+set.seed(2)
+data_split <- initial_split(
+  Carseats, 
+  strata = "Sales",
+  prop = 0.9
+  )
+data_split
+```
+
+```{r}
+Carseats_other <- training(data_split)
+dim(Carseats_other)
+```
+
+```{r}
+Carseats_test <- testing(data_split)
+dim(Carseats_test)
+```
+
+Recipe
+```{r}
+svm_recipe <- 
+  recipe(
+    Sales ~ ., 
+    data = Carseats_other
+  ) %>%
+  # create traditional dummy variables (necessary for svm)
+  step_dummy(all_nominal_predictors()) %>%
+  # zero-variance filter
+  step_zv(all_numeric_predictors()) %>% 
+  # center and scale numeric data
+  step_normalize(all_numeric_predictors()) 
+  
+svm_recipe
+
+```
+Model radial kernel
+```{r}
+svm_mod <- 
+  svm_rbf(
+    mode = "classification",
+    cost = tune(),
+    rbf_sigma = tune()
+  ) %>% 
+  set_engine("kernlab")
+svm_mod
+```
+Workflow
+```{r}
+svm_wf <- workflow() %>%
+  add_recipe(svm_recipe) %>%
+  add_model(svm_mod)
+svm_wf
+```
+
+Tune
+```{r}
+param_grid <- grid_regular(
+  cost(range = c(-8, 10)),
+  rbf_sigma(range = c(-5, -2)),
+  levels = c(14, 5)
+  )
+param_grid
+```
+Cross-validation
+```{r}
+set.seed(2)
+
+folds <- vfold_cv(Carseats_other, v = 5)
+folds
+```
+
+```{r}
+svm_fit <- svm_wf %>%
+  tune_grid(
+    resamples = folds,
+    grid = param_grid,
+    metrics = metric_set(roc_auc, accuracy)
+    )
+svm_fit
+```
+
+```{r}
+svm_fit %>%
+  collect_metrics() %>%
+  print(width = Inf) %>%
+  filter(.metric == "roc_auc") %>%
+  ggplot(mapping = aes(x = cost, y = mean, alpha = rbf_sigma)) +
+  geom_point() +
+  geom_line(aes(group = rbf_sigma)) +
+  labs(x = "Cost", y = "CV AUC") +
+  scale_x_log10()
+```
+
+```{r}
+svm_fit %>%
+  show_best("roc_auc")
+```
+
+```{r}
+best_svm <- svm_fit %>%
+  select_best("roc_auc")
+best_svm
+```
+
+Finalize the model
+```{r}
+# Final workflow
+final_wf <- svm_wf %>%
+  finalize_workflow(best_svm)
+final_wf
+```
+
+```{r}
+# Fit the whole training set, then predict the test cases
+final_fit <- 
+  final_wf %>%
+  last_fit(data_split)
+final_fit
+```
+
+```{r}
+# Test metrics
+final_fit %>% 
+  collect_metrics()
+```
+
+
+Model with polynomial kernel
+
+Linear:
+```{r}
+svm_mod_l <- 
+  svm_poly(
+    mode = "classification",
+    cost = tune(),
+    degree = tune(),
+    # scale_factor = tune()
+  ) %>% 
+  set_engine("kernlab")
+svm_mod_l
+```
+
+```{r}
+svm_wf_l <- workflow() %>%
+  add_recipe(svm_recipe) %>%
+  add_model(svm_mod_l)
+svm_wf_l
+```
+
+```{r}
+param_grid_l <- grid_regular(
+  cost(range = c(-5, 2)),
+  degree(range = c(1,1)),
+  #scale_factor(range = c(-1, 1)),
+  levels = c(5)
+  )
+param_grid_l
+```
+
+```{r}
+svm_fit_l <- svm_wf_l %>%
+  tune_grid(
+    resamples = folds,
+    grid = param_grid_l,
+    metrics = metric_set(roc_auc, accuracy)
+    )
+svm_fit_l
+```
+
+```{r}
+svm_fit_l %>%
+  collect_metrics() %>%
+  print(width = Inf) %>%
+  filter(.metric == "roc_auc" ) %>%
+  ggplot(mapping = aes(x = degree, y = mean)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Cost", y = "CV AUC") +
+  scale_x_log10()
+```
+
+```{r}
+best_svm_l <- svm_fit_l %>%
+  select_best("roc_auc")
+best_svm_l
+```
+
+```{r}
+final_wf_l <- svm_wf_l %>%
+  finalize_workflow(best_svm_l)
+final_wf_l
+```
+
+```{r}
+final_fit_l <- 
+  final_wf_l %>%
+  last_fit(data_split)
+final_fit_l
+```
+
+```{r}
+final_fit_l %>% 
+  collect_metrics()
+```
+
+Non linear:
+```{r}
+svm_mod_p <- 
+  svm_poly(
+    mode = "classification",
+    cost = tune(),
+    degree = tune(),
+    # scale_factor = tune()
+  ) %>% 
+  set_engine("kernlab")
+svm_mod_p
+```
+
+```{r}
+svm_wf_p <- workflow() %>%
+  add_recipe(svm_recipe) %>%
+  add_model(svm_mod_p)
+svm_wf_p
+```
+
+```{r}
+param_grid_p <- grid_regular(
+  cost(range = c(-5, 2)),
+  degree(range = c(1, 5)),
+  #scale_factor(range = c(-1, 1)),
+  levels = c(5)
+  )
+param_grid_p
+```
+```{r}
+svm_fit_p <- svm_wf_p %>%
+  tune_grid(
+    resamples = folds,
+    grid = param_grid_p,
+    metrics = metric_set(roc_auc, accuracy)
+    )
+svm_fit_p
+```
+
+```{r}
+svm_fit_p %>%
+  collect_metrics() %>%
+  print(width = Inf) %>%
+  filter(.metric == "roc_auc" ) %>%
+  ggplot(mapping = aes(x = degree, y = mean)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Cost", y = "CV AUC") +
+  scale_x_log10()
+```
+
+```{r}
+svm_fit_p %>%
+  show_best("roc_auc")
+```
+
+```{r}
+best_svm_p <- svm_fit_p %>%
+  select_best("roc_auc")
+best_svm_p
+```
+
+```{r}
+final_wf_p <- svm_wf_p %>%
+  finalize_workflow(best_svm_p)
+final_wf_p
+```
+
+```{r}
+final_fit_p <- 
+  final_wf_p %>%
+  last_fit(data_split)
+final_fit_p
+```
+
+```{r}
+final_fit_p %>% 
+  collect_metrics()
+```
+
+```{r}
+library(doParallel)
+set.seed(101)
+split_obj <- initial_split(data = Carseats, prop = 0.7, strata = Sales)
+train <- training(split_obj)
+test <- testing(split_obj)
+
+
+# Create the recipe
+recipe(Sales ~ ., data = train) %>%
+  # create traditional dummy variables (necessary for svm)
+  step_dummy(all_nominal_predictors()) %>%
+  # zero-variance filter
+  step_zv(all_numeric_predictors()) %>% 
+  # center and scale numeric data
+  step_normalize(all_numeric_predictors()) %>%
+  # estimate the means and standard deviations
+  prep() -> recipe_obj
+
+# Bake
+train <- bake(recipe_obj, new_data=train)
+test <- bake(recipe_obj, new_data=test)
+```
+
+```{r}
+# library(vip)
+# final_fit_p %>% 
+#   pluck(".workflow", 1) %>%   
+#   pull_workflow_fit() %>% 
+#   vip(method = "permute", 
+#       target = "Sales", metric = "accuracy",
+#       pred_wrapper = kernlab::predict, train = train)
+```
+```{r}
+# svm_rbf_spec <- svm_rbf() %>%
+#   set_mode("classification") %>%
+#   set_engine("kernlab")
+# 
+# svm_rbf_fit <- svm_rbf_spec %>%
+#   fit(Sales ~ ., data = train)
+# 
+# svm_rbf_fit %>%
+#   extract_fit_engine() %>%
+#   plot()
+```
+
+The radial kernel model has the auc of 	0.9705882, and the polynomial kernel model with both linear and non-linear have the auc of 	0.9705882, which is the same for all SVM models. Also, SMVs in this situation have a higher accuracy than all of other models in Homework4.
+
+
+
+
+## Bonus (10pts)
+
+Let
+$$
+f(X) = \beta_0 + \beta_1 X_1 + \cdots + \beta_p X_p = \beta_0 + \beta^T X.
+$$
+Then $f(X)=0$ defines a hyperplane in $\mathbb{R}^p$. Show that $f(x)$ is proportional to the signed distance of a point $x$ to the hyperplane $f(X) = 0$. 
+
+The distance is given by:
+$$
+d = \frac{(\beta^T(x - X_0))}{\|\beta\|}
+$$
+where $X_0$ is a point on the hyperplane. 
+
+As $f(X_0) = \beta_0 + \beta^T X_0 = 0$, we can substitute $X_0$ into $f(X)$ to have:
+$$
+f(x) = \beta_0 + \beta^T x = \beta^T x - \beta^T X_0
+$$
+After substituting $f(x)$ into the distance formula, we have:
+$$
+d = \frac{(\beta^T(x - X_0))}{\|\beta\|} = \frac{f(x)}{\|\beta\|}
+$$
+Therefore, $f(x)$ is proportional to the signed distance of a point $x$ to the hyperplane $f(X) = 0$.
